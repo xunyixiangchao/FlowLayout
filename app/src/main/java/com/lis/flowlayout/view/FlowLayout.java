@@ -88,8 +88,16 @@ public class FlowLayout extends ViewGroup {
             //取最高的一行高
             curHeight = Math.max(curHeight, childHeight);
 
+            //最后一行
+            if (i == itemCount - 1) {
+                flowLayoutHeight += curHeight;
+                flowLayoutWidth=Math.max(flowLayoutWidth,curWidth);
+                lineHeights.add(curHeight);
+                views.add(lineViews);
+            }
 
         }
+
         //FlowLayout最终宽高
         setMeasuredDimension(widthMode == MeasureSpec.EXACTLY ? widthSize : flowLayoutWidth,
                 heightMode == MeasureSpec.EXACTLY ? heightSize : flowLayoutHeight);
