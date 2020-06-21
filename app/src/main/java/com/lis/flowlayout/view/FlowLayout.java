@@ -2,7 +2,9 @@ package com.lis.flowlayout.view;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 
 import java.util.ArrayList;
@@ -23,11 +25,25 @@ public class FlowLayout extends ViewGroup {
 
     public FlowLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        ViewConfiguration configuration = ViewConfiguration.get(context);
+        // mTouchSlop = ViewConfigurationCompat.getScaledPagingTouchSlop(configuration);
+        mTouchSlop = configuration.getScaledPagingTouchSlop();
     }
 
     List<View> lineViews; //一行中的view
     List<List<View>> views;   //总行
     List<Integer> lineHeights; //每行的高度
+
+    //onInterceptTouchEvent
+    private float mLastX = 0;
+    private float mLastY = 0;
+    private float mTouchSlop = 0;
+    //onTouchEvent
+    private float mTouchY = 0;
+    private int subY = 0;
+
+
+    private boolean scrollable = false;
 
     private void init() {
         lineViews = new ArrayList<>();
@@ -62,6 +78,7 @@ public class FlowLayout extends ViewGroup {
             // int heightSpec = getChildMeasureSpec(heightMeasureSpec, 0, lp.height);
             // view.measure(widthSpec, heightSpec);
             //2 测量子View
+            ViewGroup.LayoutParams lp = view.getLayoutParams();
             measureChild(view, widthMeasureSpec, heightMeasureSpec);
             //3
             // measureChildWithMargins(view, widthMeasureSpec, 0, heightMeasureSpec, 0);
@@ -87,20 +104,23 @@ public class FlowLayout extends ViewGroup {
             curWidth += childWidth;
             //取最高的一行高
             curHeight = Math.max(curHeight, childHeight);
-
             //最后一行
             if (i == itemCount - 1) {
                 flowLayoutHeight += curHeight;
-                flowLayoutWidth=Math.max(flowLayoutWidth,curWidth);
+                flowLayoutWidth = Math.max(flowLayoutWidth, curWidth);
                 lineHeights.add(curHeight);
                 views.add(lineViews);
             }
 
         }
-
+        //判断是否能够滑动
+        scrollable = flowLayoutHeight > heightSize;
+        subY = flowLayoutHeight - heightSize;
         //FlowLayout最终宽高
         setMeasuredDimension(widthMode == MeasureSpec.EXACTLY ? widthSize : flowLayoutWidth,
                 heightMode == MeasureSpec.EXACTLY ? heightSize : flowLayoutHeight);
+
+        //重新测量
 
     }
 
@@ -134,5 +154,79 @@ public class FlowLayout extends ViewGroup {
             curY += lineHeight;
         }
 
+    }
+
+
+    /**
+     * 判断拦截
+     *
+     * @param ev
+     * @return
+     */
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        // super.onInterceptTouchEvent(ev);
+        boolean isIntercepted = false;
+        float interceptX = ev.getX();
+        float interceptY = ev.getY();
+        switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                System.out.println("MotionEvent.ACTION_DOWN");
+                mLastX = interceptX;
+                mLastY = interceptY;
+                isIntercepted = false;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                System.out.println("MotionEvent.ACTION_MOVE");
+                float dx = interceptX - mLastX;
+                float dy = interceptY - mLastY;
+                if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > mTouchSlop) {
+                    isIntercepted = true;
+                } else {
+                    isIntercepted = false;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                isIntercepted = false;
+                break;
+        }
+        mLastX = interceptX;
+        mLastY = interceptY;
+        return isIntercepted;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (!scrollable) {
+            return super.onTouchEvent(event);
+        }
+        float curY = event.getY();
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mTouchY = curY;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                float dy = mTouchY - curY;
+                // scrollBy(0, (int) dy);
+                int oldScrollY = getScrollY();
+                int scrollY = oldScrollY + (int) dy;
+                if (scrollY > 0) {
+                    scrollY -= mTouchSlop;
+                } else {
+                    scrollY += mTouchSlop;
+                }
+                if (scrollY < 0) {
+                    scrollY = 0;
+                }
+                if (scrollY > subY) {
+                    scrollY = subY;
+                }
+                scrollTo(0, scrollY);
+                mTouchY = curY;
+                break;
+            case MotionEvent.ACTION_UP:
+                break;
+        }
+        return super.onTouchEvent(event);
     }
 }
